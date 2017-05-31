@@ -298,31 +298,32 @@ static PermissionTool *tools;
  *  日历/备忘录权限
  */
 + (void)entityPermission:(EKEntityType)entityType result:(void (^)(NSInteger authStatus))block {
-    EKAuthorizationStatus status = [EKEventStore  authorizationStatusForEntityType:entityType];
-    switch (status) {
-        case EKAuthorizationStatusAuthorized:
-            block(1);
-            break;
-        case EKAuthorizationStatusDenied:
-            block(3);
-            break;
-        case EKAuthorizationStatusNotDetermined: {
-            EKEventStore *store = [[EKEventStore alloc]init];
-            [store requestAccessToEntityType:entityType completion:^(BOOL granted, NSError * _Nullable error) {
-                if (granted) {
-                    block(1);
-                } else {
-                    block(3);
-                }
-            }];
-            break;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        switch (status) {
+            case EKAuthorizationStatusAuthorized:
+                block(1);
+                break;
+            case EKAuthorizationStatusDenied:
+                block(3);
+                break;
+            case EKAuthorizationStatusNotDetermined: {
+                EKEventStore *store = [[EKEventStore alloc]init];
+                [store requestAccessToEntityType:entityType completion:^(BOOL granted, NSError * _Nullable error) {
+                    if (granted) {
+                        block(1);
+                    } else {
+                        block(3);
+                    }
+                }];
+                break;
+            }
+            case EKAuthorizationStatusRestricted:
+                block(2);
+                break;
+            default:
+                break;
         }
-        case EKAuthorizationStatusRestricted:
-            block(2);
-            break;
-        default:
-            break;
-    }
+    });
 }
 //获取日历权限
 +(void)getEventPermission:(void (^)(NSInteger authStatus))block {
