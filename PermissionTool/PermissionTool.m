@@ -92,31 +92,35 @@ static PermissionTool *tools;
 }
 //摄像头/麦克风
 + (void)userPermission:(NSString*)mediaTyp result:(void (^)(NSInteger authStatus))block {
-    AVAuthorizationStatus authStatus = [AVCaptureDevice authorizationStatusForMediaType:mediaTyp];
-    switch (authStatus) {
-        case AVAuthorizationStatusNotDetermined: {
-            [AVCaptureDevice requestAccessForMediaType:mediaTyp completionHandler:^(BOOL granted) {
-                if (granted) {
-                    block(1);
-                } else {
-                    block(3);
-                }
-            }];
-            break;
+        AVAuthorizationStatus authStatus = [AVCaptureDevice authorizationStatusForMediaType:mediaTyp];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        switch (authStatus) {
+            case AVAuthorizationStatusNotDetermined: {
+                [AVCaptureDevice requestAccessForMediaType:mediaTyp completionHandler:^(BOOL granted) {
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        if (granted) {
+                            block(1);
+                        } else {
+                            block(3);
+                        }
+                    });
+                }];
+                break;
+            }
+            case AVAuthorizationStatusRestricted: {
+                block(2);
+                break;
+            }
+            case AVAuthorizationStatusDenied: {
+                block(3);
+                break;
+            }
+            default: {
+                block(1);
+                break;
+            }
         }
-        case AVAuthorizationStatusRestricted: {
-            block(2);
-            break;
-        }
-        case AVAuthorizationStatusDenied: {
-            block(3);
-            break;
-        }
-        default: {
-            block(1);
-            break;
-        }
-    }
+    });
 }
 /**
  *  获取访问摄像头权限(模拟器上无法测试)
@@ -141,9 +145,7 @@ static PermissionTool *tools;
         NSLog(@"为适配iOS10 请在info.plist文件中加入\n\"NSMicrophoneUsageDescription\"字段");
     }
     [PermissionTool userPermission:AVMediaTypeAudio result:^(NSInteger authStatus) {
-        dispatch_async(dispatch_get_main_queue(), ^{
-            block(authStatus);
-        });
+        block(authStatus);
     }];
 }
 
@@ -245,11 +247,13 @@ static PermissionTool *tools;
             static CNContactStore *contactStore;
             contactStore =[[CNContactStore alloc]init];
             [contactStore requestAccessForEntityType:CNEntityTypeContacts completionHandler:^(BOOL granted, NSError * _Nullable error) {
-                if (granted) {
-                    block(1);
-                } else {
-                    block(3);
-                }
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    if (granted) {
+                        block(1);
+                    } else {
+                        block(3);
+                    }
+                });
             }];
             break;
         }
@@ -277,12 +281,15 @@ static PermissionTool *tools;
         case kABAuthorizationStatusNotDetermined: {
             ABAddressBookRef addressBook = ABAddressBookCreateWithOptions(NULL, NULL);
             ABAddressBookRequestAccessWithCompletion(addressBook, ^(bool granted, CFErrorRef error) {
-                if (granted) {
-                    block(1);
-                } else {
-                    block(3);
-                }
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    if (granted) {
+                        block(1);
+                    } else {
+                        block(3);
+                    }
+                });
                 CFRelease(addressBook);
+                    
             });
             break;
         }
@@ -298,6 +305,7 @@ static PermissionTool *tools;
  *  日历/备忘录权限
  */
 + (void)entityPermission:(EKEntityType)entityType result:(void (^)(NSInteger authStatus))block {
+    EKAuthorizationStatus status = [EKEventStore  authorizationStatusForEntityType:entityType];
     dispatch_async(dispatch_get_main_queue(), ^{
         switch (status) {
             case EKAuthorizationStatusAuthorized:
@@ -309,11 +317,13 @@ static PermissionTool *tools;
             case EKAuthorizationStatusNotDetermined: {
                 EKEventStore *store = [[EKEventStore alloc]init];
                 [store requestAccessToEntityType:entityType completion:^(BOOL granted, NSError * _Nullable error) {
-                    if (granted) {
-                        block(1);
-                    } else {
-                        block(3);
-                    }
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        if (granted) {
+                            block(1);
+                        } else {
+                            block(3);
+                        }
+                    });
                 }];
                 break;
             }
