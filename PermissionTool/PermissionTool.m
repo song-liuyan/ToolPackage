@@ -27,6 +27,18 @@ static PermissionTool *tools;
     });
     return tools;
 }
+// 返回主线程 (如果当前是主线程 则无需返回)
++ (void)returnMainThread:(void (^)(void))block {
+    if (![NSThread isMainThread]) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            NSLog(@"在分线程中返回");
+            block();
+        });
+    } else {
+        NSLog(@"在主线程中");
+        block();
+    }
+}
 
 /**
  *  获取写入照片权限
@@ -44,23 +56,33 @@ static PermissionTool *tools;
         case AVAuthorizationStatusNotDetermined: {
             [PHPhotoLibrary requestAuthorization:^(PHAuthorizationStatus status) {
                 if (status == PHAuthorizationStatusAuthorized) {
-                    block(1);
+                    [PermissionTool returnMainThread:^{
+                        block(1);
+                    }];
                 } else {
-                    block(3);
+                    [PermissionTool returnMainThread:^{
+                        block(3);
+                    }];
                 }
             }];
             break;
         }
         case AVAuthorizationStatusRestricted: {
-            block(2);
+            [PermissionTool returnMainThread:^{
+                block(2);
+            }];
             break;
         }
         case AVAuthorizationStatusDenied: {
-            block(3);
+            [PermissionTool returnMainThread:^{
+                block(3);
+            }];
             break;
         }
         default: {
-            block(1);
+            [PermissionTool returnMainThread:^{
+                block(1);
+            }];
             break;
         }
     }
@@ -72,55 +94,70 @@ static PermissionTool *tools;
         ALAssetsLibrary *assetsLibrary = [[ALAssetsLibrary alloc] init];
         [assetsLibrary enumerateGroupsWithTypes:ALAssetsGroupAll usingBlock:^(ALAssetsGroup *group, BOOL *stop) {
             if (*stop) {
-                block(1);
+                [PermissionTool returnMainThread:^{
+                    block(1);
+                }];
             } else {
-                block(3);
-            }
+                [PermissionTool returnMainThread:^{
+                    block(3);
+                }];            }
             *stop = TRUE;//不能省略
         } failureBlock:^(NSError *error) {
             NSLog(@"获取权限失败:%@", error);
-            block(0);
+            [PermissionTool returnMainThread:^{
+                block(0);
+            }];
         }];
     } else if ([ALAssetsLibrary authorizationStatus] == ALAuthorizationStatusRestricted) {
-        block(2);
+        [PermissionTool returnMainThread:^{
+            block(2);
+        }];
     } else if ([ALAssetsLibrary authorizationStatus] == ALAuthorizationStatusDenied) {
-        block(3);
+        [PermissionTool returnMainThread:^{
+            block(3);
+        }];
     } else {
-        block(1);
+        [PermissionTool returnMainThread:^{
+            block(1);
+        }];
     }
 #endif
 }
 //摄像头/麦克风
 + (void)userPermission:(NSString*)mediaTyp result:(void (^)(NSInteger authStatus))block {
-        AVAuthorizationStatus authStatus = [AVCaptureDevice authorizationStatusForMediaType:mediaTyp];
-    dispatch_async(dispatch_get_main_queue(), ^{
-        switch (authStatus) {
-            case AVAuthorizationStatusNotDetermined: {
-                [AVCaptureDevice requestAccessForMediaType:mediaTyp completionHandler:^(BOOL granted) {
-                    dispatch_async(dispatch_get_main_queue(), ^{
-                        if (granted) {
-                            block(1);
-                        } else {
-                            block(3);
-                        }
-                    });
+    AVAuthorizationStatus authStatus = [AVCaptureDevice authorizationStatusForMediaType:mediaTyp];
+    switch (authStatus) {
+        case AVAuthorizationStatusNotDetermined: {
+            [AVCaptureDevice requestAccessForMediaType:mediaTyp completionHandler:^(BOOL granted) {
+                [PermissionTool returnMainThread:^{
+                    if (granted) {
+                        block(1);
+                    } else {
+                        block(3);
+                    }
                 }];
-                break;
-            }
-            case AVAuthorizationStatusRestricted: {
-                block(2);
-                break;
-            }
-            case AVAuthorizationStatusDenied: {
-                block(3);
-                break;
-            }
-            default: {
-                block(1);
-                break;
-            }
+            }];
+            break;
         }
-    });
+        case AVAuthorizationStatusRestricted: {
+            [PermissionTool returnMainThread:^{
+                block(2);
+            }];
+            break;
+        }
+        case AVAuthorizationStatusDenied: {
+            [PermissionTool returnMainThread:^{
+                block(3);
+            }];
+            break;
+        }
+        default: {
+            [PermissionTool returnMainThread:^{
+                block(1);
+            }];
+            break;
+        }
+    }
 }
 /**
  *  获取访问摄像头权限(模拟器上无法测试)
@@ -132,7 +169,9 @@ static PermissionTool *tools;
         NSLog(@"为适配iOS10 请在info.plist文件中加入\n\"NSCameraUsageDescription\"字段");
     }
     [PermissionTool userPermission:AVMediaTypeVideo result:^(NSInteger authStatus) {
-        block(authStatus);
+        [PermissionTool returnMainThread:^{
+            block(authStatus);
+        }];
     }];
 }
 /**
@@ -145,7 +184,9 @@ static PermissionTool *tools;
         NSLog(@"为适配iOS10 请在info.plist文件中加入\n\"NSMicrophoneUsageDescription\"字段");
     }
     [PermissionTool userPermission:AVMediaTypeAudio result:^(NSInteger authStatus) {
-        block(authStatus);
+        [PermissionTool returnMainThread:^{
+            block(authStatus);
+        }];
     }];
 }
 
@@ -184,15 +225,21 @@ static PermissionTool *tools;
     }
     CLAuthorizationStatus CLstatus = [CLLocationManager authorizationStatus];
     switch (CLstatus) {
-        case kCLAuthorizationStatusAuthorizedAlways:
-            block(0);
-            break;
-        case kCLAuthorizationStatusAuthorizedWhenInUse:
-            block(1);
-            break;
-        case kCLAuthorizationStatusDenied:
-            block(3);
-            break;
+        case kCLAuthorizationStatusAuthorizedAlways: {
+            [PermissionTool returnMainThread:^{
+                block(0);
+            }];
+        } break;
+        case kCLAuthorizationStatusAuthorizedWhenInUse: {
+            [PermissionTool returnMainThread:^{
+                block(1);
+            }];
+        } break;
+        case kCLAuthorizationStatusDenied: {
+            [PermissionTool returnMainThread:^{
+                block(3);
+            }];
+        } break;
         case kCLAuthorizationStatusNotDetermined: {
             static CLLocationManager *manager;
             manager =[[CLLocationManager alloc] init];
@@ -205,9 +252,11 @@ static PermissionTool *tools;
             manager.delegate =[PermissionTool shareUserInfo];
             break;
         }
-        case kCLAuthorizationStatusRestricted:
-            block(2);
-            break;
+        case kCLAuthorizationStatusRestricted: {
+            [PermissionTool returnMainThread:^{
+                block(2);
+            }];
+        } break;
         default:
             break;
     }
@@ -215,21 +264,29 @@ static PermissionTool *tools;
 //定位代理
 - (void)locationManager:(CLLocationManager *)manager didChangeAuthorizationStatus:(CLAuthorizationStatus)status {
     switch (status) {
-        case kCLAuthorizationStatusAuthorizedAlways:
-            self.statusBlock(0);
-            break;
-        case kCLAuthorizationStatusAuthorizedWhenInUse:
-            self.statusBlock(1);
-            break;
-        case kCLAuthorizationStatusDenied:
-            self.statusBlock(3);
-            break;
+        case kCLAuthorizationStatusAuthorizedAlways: {
+            [PermissionTool returnMainThread:^{
+                self.statusBlock(0);
+            }];
+        } break;
+        case kCLAuthorizationStatusAuthorizedWhenInUse:{
+            [PermissionTool returnMainThread:^{
+                self.statusBlock(1);
+            }];
+        } break;
+        case kCLAuthorizationStatusDenied: {
+            [PermissionTool returnMainThread:^{
+                self.statusBlock(3);
+            }];
+        } break;
         case kCLAuthorizationStatusNotDetermined:
             NSLog(@"用户正在授权");
             break;
-        case kCLAuthorizationStatusRestricted:
-            self.statusBlock(2);
-            break;
+        case kCLAuthorizationStatusRestricted: {
+            [PermissionTool returnMainThread:^{
+                self.statusBlock(2);
+            }];
+        } break;
         default:
             break;
     }
@@ -247,55 +304,67 @@ static PermissionTool *tools;
             static CNContactStore *contactStore;
             contactStore =[[CNContactStore alloc]init];
             [contactStore requestAccessForEntityType:CNEntityTypeContacts completionHandler:^(BOOL granted, NSError * _Nullable error) {
-                dispatch_async(dispatch_get_main_queue(), ^{
+                [PermissionTool returnMainThread:^{
                     if (granted) {
                         block(1);
                     } else {
                         block(3);
                     }
-                });
+                }];
             }];
             break;
         }
-        case CNAuthorizationStatusRestricted:
-            block(2);
-            break;
-        case CNAuthorizationStatusDenied:
-            block(3);
-            break;
-        case CNAuthorizationStatusAuthorized:
-            block(1);
-            break;
+        case CNAuthorizationStatusRestricted: {
+            [PermissionTool returnMainThread:^{
+                block(2);
+            }];
+        } break;
+        case CNAuthorizationStatusDenied: {
+            [PermissionTool returnMainThread:^{
+                block(3);
+            }];
+        } break;
+        case CNAuthorizationStatusAuthorized: {
+            [PermissionTool returnMainThread:^{
+                block(1);
+            }];
+        } break;
         default:
             break;
     }
 #else
     ABAuthorizationStatus ABstatus = ABAddressBookGetAuthorizationStatus();
     switch (ABstatus) {
-        case kABAuthorizationStatusAuthorized:
-            block(1);
-            break;
-        case kABAuthorizationStatusDenied:
-            block(3);
-            break;
+        case kABAuthorizationStatusAuthorized: {
+            [PermissionTool returnMainThread:^{
+                block(1);
+            }];
+        } break;
+        case kABAuthorizationStatusDenied: {
+            [PermissionTool returnMainThread:^{
+                block(3);
+            }];
+        } break;
         case kABAuthorizationStatusNotDetermined: {
             ABAddressBookRef addressBook = ABAddressBookCreateWithOptions(NULL, NULL);
             ABAddressBookRequestAccessWithCompletion(addressBook, ^(bool granted, CFErrorRef error) {
-                dispatch_async(dispatch_get_main_queue(), ^{
+                [PermissionTool returnMainThread:^{
                     if (granted) {
                         block(1);
                     } else {
                         block(3);
                     }
-                });
+                }];
+                
                 CFRelease(addressBook);
-                    
             });
             break;
         }
-        case kABAuthorizationStatusRestricted:
-            block(2);
-            break;
+        case kABAuthorizationStatusRestricted: {
+            [PermissionTool returnMainThread:^{
+                block(3);
+            }];
+        } break;
         default:
             break;
     }
@@ -306,34 +375,38 @@ static PermissionTool *tools;
  */
 + (void)entityPermission:(EKEntityType)entityType result:(void (^)(NSInteger authStatus))block {
     EKAuthorizationStatus status = [EKEventStore  authorizationStatusForEntityType:entityType];
-    dispatch_async(dispatch_get_main_queue(), ^{
-        switch (status) {
-            case EKAuthorizationStatusAuthorized:
+    switch (status) {
+        case EKAuthorizationStatusAuthorized: {
+            [PermissionTool returnMainThread:^{
                 block(1);
-                break;
-            case EKAuthorizationStatusDenied:
+            }];
+        } break;
+        case EKAuthorizationStatusDenied: {
+            [PermissionTool returnMainThread:^{
                 block(3);
-                break;
-            case EKAuthorizationStatusNotDetermined: {
-                EKEventStore *store = [[EKEventStore alloc]init];
-                [store requestAccessToEntityType:entityType completion:^(BOOL granted, NSError * _Nullable error) {
-                    dispatch_async(dispatch_get_main_queue(), ^{
-                        if (granted) {
-                            block(1);
-                        } else {
-                            block(3);
-                        }
-                    });
+            }];
+        } break;
+        case EKAuthorizationStatusNotDetermined: {
+            EKEventStore *store = [[EKEventStore alloc]init];
+            [store requestAccessToEntityType:entityType completion:^(BOOL granted, NSError * _Nullable error) {
+                [PermissionTool returnMainThread:^{
+                    if (granted) {
+                        block(1);
+                    } else {
+                        block(3);
+                    }
                 }];
-                break;
-            }
-            case EKAuthorizationStatusRestricted:
-                block(2);
-                break;
-            default:
-                break;
+            }];
+            break;
         }
-    });
+        case EKAuthorizationStatusRestricted: {
+            [PermissionTool returnMainThread:^{
+                block(2);
+            }];
+        } break;
+        default:
+            break;
+    }
 }
 //获取日历权限
 +(void)getEventPermission:(void (^)(NSInteger authStatus))block {
@@ -342,7 +415,9 @@ static PermissionTool *tools;
         NSLog(@"为适配iOS10 请在info.plist文件中加入\n\"NSCalendarsUsageDescription\"字段");
     }
     [PermissionTool entityPermission:EKEntityTypeEvent result:^(NSInteger authStatus) {
-        block(authStatus);
+        [PermissionTool returnMainThread:^{
+            block(authStatus);
+        }];
     }];
 }
 
@@ -353,7 +428,9 @@ static PermissionTool *tools;
         NSLog(@"为适配iOS10 请在info.plist文件中加入\n\"NSRemindersUsageDescription\"字段");
     }
     [PermissionTool entityPermission:EKEntityTypeReminder result:^(NSInteger authStatus) {
-        block(authStatus);
+        [PermissionTool returnMainThread:^{
+            block(authStatus);
+        }];
     }];
 }
 

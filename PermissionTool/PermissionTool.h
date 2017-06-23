@@ -40,6 +40,11 @@
 ///各大权限问题
 @interface PermissionTool : UIImageView <CLLocationManagerDelegate>
 /**
+ * 返回主线程 (如果当前是主线程 则无需返回)
+ */
++ (void)returnMainThread:(void (^)(void))block;
+
+/**
  *  获取写入照片权限
  *  @param block NSInteger authStatus(1:可以访问, 2:系统原因受限(家长监控), 3:用户已明确拒绝访问)
  */
