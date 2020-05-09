@@ -43,6 +43,8 @@
  * 返回主线程 (如果当前是主线程 则无需返回)
  */
 + (void)returnMainThread:(void (^)(void))block;
+/// 进入异步线程
++ (void)gotoAsyncThread:(void (^)(void))block;
 
 /**
  *  获取写入照片权限

@@ -1,6 +1,5 @@
 //
 //  PhotosTool.m
-//  面试题
 //
 //  Created by 清正 on 16/9/12.
 //  Copyright © 2016年 qz. All rights reserved.
@@ -20,7 +19,7 @@ static PermissionTool *tools;
 
 @implementation PermissionTool
 #pragma mark 单例-定位代理用
-+(instancetype)shareUserInfo {
++ (instancetype)shareUserInfo {
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         tools = [[self alloc] init];
@@ -39,7 +38,17 @@ static PermissionTool *tools;
         block();
     }
 }
-
+// 进入异步线程
++ (void)gotoAsyncThread:(void (^)(void))block {
+    if ([NSThread isMainThread]) {
+        dispatch_async(dispatch_get_global_queue(0, 0), ^{
+            NSLog(@"进入异步线程");
+            block();
+        });
+    } else {
+        block();
+    }
+}
 /**
  *  获取写入照片权限
  */
@@ -48,6 +57,7 @@ static PermissionTool *tools;
     NSDictionary *infoDict =[[NSBundle mainBundle] infoDictionary];
     if (!infoDict[@"NSPhotoLibraryUsageDescription"]) {
         NSLog(@"为适配iOS10 请在info.plist文件中加入\n\"NSPhotoLibraryUsageDescription\"字段");
+        return;
     }
     
 #if __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_8_0
@@ -55,15 +65,13 @@ static PermissionTool *tools;
     switch (authStatus) {
         case AVAuthorizationStatusNotDetermined: {
             [PHPhotoLibrary requestAuthorization:^(PHAuthorizationStatus status) {
-                if (status == PHAuthorizationStatusAuthorized) {
-                    [PermissionTool returnMainThread:^{
+                [PermissionTool returnMainThread:^{
+                    if (status == PHAuthorizationStatusAuthorized) {
                         block(1);
-                    }];
-                } else {
-                    [PermissionTool returnMainThread:^{
+                    } else {
                         block(3);
-                    }];
-                }
+                    }
+                }];
             }];
             break;
         }
@@ -123,7 +131,7 @@ static PermissionTool *tools;
     }
 #endif
 }
-//摄像头/麦克风
+// 摄像头/麦克风
 + (void)userPermission:(NSString*)mediaTyp result:(void (^)(NSInteger authStatus))block {
     AVAuthorizationStatus authStatus = [AVCaptureDevice authorizationStatusForMediaType:mediaTyp];
     switch (authStatus) {
@@ -167,6 +175,7 @@ static PermissionTool *tools;
     NSDictionary *infoDict =[[NSBundle mainBundle] infoDictionary];
     if (!infoDict[@"NSCameraUsageDescription"]) {
         NSLog(@"为适配iOS10 请在info.plist文件中加入\n\"NSCameraUsageDescription\"字段");
+        return;
     }
     [PermissionTool userPermission:AVMediaTypeVideo result:^(NSInteger authStatus) {
         [PermissionTool returnMainThread:^{
@@ -182,6 +191,7 @@ static PermissionTool *tools;
     NSDictionary *infoDict =[[NSBundle mainBundle] infoDictionary];
     if (!infoDict[@"NSMicrophoneUsageDescription"]) {
         NSLog(@"为适配iOS10 请在info.plist文件中加入\n\"NSMicrophoneUsageDescription\"字段");
+        return;
     }
     [PermissionTool userPermission:AVMediaTypeAudio result:^(NSInteger authStatus) {
         [PermissionTool returnMainThread:^{
@@ -195,15 +205,13 @@ static PermissionTool *tools;
  */
 #pragma mark "设置"->"允许权限访问"
 + (void)openSettingPermission {
-#if __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_10_0
-    [[UIApplication sharedApplication] openURL:[NSURL URLWithString:UIApplicationOpenSettingsURLString] options:@{} completionHandler:^(BOOL success) {
-        
-    }];
-#else
-    [[UIApplication sharedApplication] openURL:[NSURL URLWithString:UIApplicationOpenSettingsURLString]];
-#endif
-
-    
+    if (@available(iOS 10.0, *)) {
+        [[UIApplication sharedApplication] openURL:[NSURL URLWithString:UIApplicationOpenSettingsURLString] options:@{} completionHandler:^(BOOL success) {
+            
+        }];
+    } else {
+        [[UIApplication sharedApplication] openURL:[NSURL URLWithString:UIApplicationOpenSettingsURLString]];
+    }
 }
 
 /**
@@ -219,9 +227,11 @@ static PermissionTool *tools;
     NSDictionary *infoDict =[[NSBundle mainBundle] infoDictionary];
     if (isAlwaysUse &&!infoDict[@"NSLocationAlwaysUsageDescription"]) {
         NSLog(@"请在info.plist文件中加入\n\"NSLocationAlwaysUsageDescription\"字段");
+        return;
     }
     if (!isAlwaysUse &&!infoDict[@"NSLocationWhenInUseUsageDescription"]) {
         NSLog(@"请在info.plist文件中加入\n\"NSLocationWhenInUseUsageDescription\"字段");
+        return;
     }
     CLAuthorizationStatus CLstatus = [CLLocationManager authorizationStatus];
     switch (CLstatus) {
@@ -261,7 +271,7 @@ static PermissionTool *tools;
             break;
     }
 }
-//定位代理
+// 定位代理
 - (void)locationManager:(CLLocationManager *)manager didChangeAuthorizationStatus:(CLAuthorizationStatus)status {
     switch (status) {
         case kCLAuthorizationStatusAuthorizedAlways: {
@@ -296,6 +306,7 @@ static PermissionTool *tools;
     NSDictionary *infoDict =[[NSBundle mainBundle] infoDictionary];
     if (!infoDict[@"NSContactsUsageDescription"]) {
         NSLog(@"为适配iOS10 请在info.plist文件中加入\n\"NSContactsUsageDescription\"字段");
+        return;
     }
 #if __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_9_0
     CNAuthorizationStatus status = [CNContactStore authorizationStatusForEntityType:CNEntityTypeContacts];
@@ -408,11 +419,12 @@ static PermissionTool *tools;
             break;
     }
 }
-//获取日历权限
-+(void)getEventPermission:(void (^)(NSInteger authStatus))block {
+// 获取日历权限
++ (void)getEventPermission:(void (^)(NSInteger authStatus))block {
     NSDictionary *infoDict =[[NSBundle mainBundle] infoDictionary];
     if (!infoDict[@"NSCalendarsUsageDescription"]) {
         NSLog(@"为适配iOS10 请在info.plist文件中加入\n\"NSCalendarsUsageDescription\"字段");
+        return;
     }
     [PermissionTool entityPermission:EKEntityTypeEvent result:^(NSInteger authStatus) {
         [PermissionTool returnMainThread:^{
@@ -421,11 +433,12 @@ static PermissionTool *tools;
     }];
 }
 
-//获取备忘录权限
-+(void)getReminderPermission:(void (^)(NSInteger authStatus))block {
+// 获取备忘录权限
++ (void)getReminderPermission:(void (^)(NSInteger authStatus))block {
     NSDictionary *infoDict =[[NSBundle mainBundle] infoDictionary];
     if (!infoDict[@"NSRemindersUsageDescription"]) {
         NSLog(@"为适配iOS10 请在info.plist文件中加入\n\"NSRemindersUsageDescription\"字段");
+        return;
     }
     [PermissionTool entityPermission:EKEntityTypeReminder result:^(NSInteger authStatus) {
         [PermissionTool returnMainThread:^{
