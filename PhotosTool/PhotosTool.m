@@ -12,7 +12,7 @@
 
 + (void)visitPhotosLowerImage:(void (^)(NSMutableArray<PhotosTool *> *photos))block {
 #if __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_8_0
-//    PHAssetCollectionSubtypeAlbumSyncedAlbum 视屏
+//    PHAssetCollectionSubtypeAlbumSyncedAlbum 视频
     PHAssetCollection *cameraRoll =[PHAssetCollection fetchAssetCollectionsWithType:PHAssetCollectionTypeSmartAlbum subtype:PHAssetCollectionSubtypeSmartAlbumUserLibrary options:nil].lastObject;
     if (!cameraRoll) {
         block(nil);
